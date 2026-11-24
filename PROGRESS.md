@@ -7,14 +7,22 @@
 |---|---|
 | 0 — Documentação inicial | ✅ Concluída |
 | 1 — Ambiente e banco | ✅ Concluída (commit `03787bb`, no GitHub) |
-| 2 — Base da API | ✅ Implementada, testada e commitada na branch `feat/api-base` — **aguardando push e merge** |
-| 3 — Alunos | ⏳ Não iniciada (aguarda autorização) |
+| 2 — Base da API | ✅ Concluída — PR #1 integrado na `main` (merge `024d9e3`) |
+| 3 — Alunos (backend) | 🔄 Em andamento — plano aprovado; Passo 1 (contrato da API) commitado em `docs/students-api-contract`, aguardando push/PR |
 
 ## Repositório
 - GitHub (público): https://github.com/sergio-stanley/fitmanager (`origin`).
-- `main`: commit `03787bb` — `chore: initialize project structure and PostgreSQL environment`, sincronizada com `origin/main`.
-- `feat/api-base`: branch local criada a partir de `03787bb`, com o commit da Etapa 2 `feat: add API base with OpenAPI, ProblemDetail error handling and Testcontainers` (ainda sem push).
-- `feat/frontend-base`: branch local criada pelo desenvolvedor via Orca, em worktree separada (`C:\Users\sstan\orca\workspaces\fitmanager\feat-frontend-base`), para o frontend em paralelo.
+- `main` = `origin/main`: `024d9e3` — *Merge pull request #1 from sergio-stanley/feat/api-base* (contém `1d146e8`, Etapa 2, e `03787bb`, Etapa 1).
+- `feat/api-base` (`1d146e8`): integrada; mantida local e remotamente até decisão do desenvolvedor.
+- `docs/students-api-contract`: criada a partir de `024d9e3` só para o PR do contrato (`API_CONTRACT.md` + este arquivo).
+- `feat/students-backend`: criada a partir de `024d9e3`; branch do backend da Etapa 3 (worktree principal).
+- `feat/frontend-base`: criada pelo desenvolvedor via Orca, em worktree separada (`C:\Users\sstan\orca\workspaces\fitmanager\feat-frontend-base`); atualizada por fast-forward para `024d9e3`.
+
+## Desenvolvimento em paralelo (dois agentes)
+- **Agente backend:** worktree principal, branches `feat/students-backend` e de documentação. É o **único** que edita os arquivos da raiz: `PROGRESS.md`, `PROJECT.md`, `README.md`, `CLAUDE.md` e `API_CONTRACT.md`.
+- **Agente frontend:** worktree do Orca, pasta `frontend/`. Documenta apenas dentro de `frontend/`. O agente backend não modifica a pasta `frontend/` nem a worktree do Orca.
+- **Integração:** pelo [API_CONTRACT.md](API_CONTRACT.md). O contrato é publicado na `main` antes da implementação, para o frontend trabalhar com mocks. Mudanças no contrato só por PR, com nova versão.
+- O `.env` não é versionado: cada worktree que precisar subir o backend deve ter sua própria cópia local.
 
 ## Ambiente
 - JDK `openjdk 21.0.13.1 LTS`, Docker 29.9.3, Docker Compose v5.7.1.
@@ -31,7 +39,7 @@
 
 **Conceitos para entrevista:** externalização de configuração (12-factor); Docker Compose, volumes e healthcheck; `ddl-auto=none` + migrations; `open-in-view=false`; perfis do Spring; HikariCP.
 
-## Etapa 2 — Base da API (commitada em `feat/api-base`, aguardando push e merge)
+## Etapa 2 — Base da API (concluída — PR #1, merge `024d9e3`)
 **Passo 1 — Branch:** `feat/api-base` criada com `git switch -c`.
 
 **Passo 2 — Swagger/OpenAPI**
@@ -62,6 +70,31 @@
 
 **Conceitos para entrevista:** OpenAPI × Swagger, code-first; starters e auto-configuração; BOM; `@Configuration`/`@Bean`; RFC 9457 e `@RestControllerAdvice`; exceções checked × unchecked; não vazar stack trace (OWASP); Testcontainers × H2; `@ServiceConnection`; `@WebMvcTest` × `@SpringBootTest`; context caching; pirâmide de testes.
 
+## Etapa 3 — Alunos / backend (em andamento)
+**Plano aprovado em 2026-11-24**, com cinco decisões:
+1. Alunos são **desativados** (`status: INACTIVE`), nunca excluídos. Não há `DELETE`, para preservar fichas e histórico.
+2. `birthDate` obrigatória; `phone` opcional.
+3. CPF fora do escopo (dado pessoal; minimização de dados pela LGPD — não é necessário para nenhuma funcionalidade atual).
+4. Contrato da API publicado **antes** da implementação, em PR separado, para o frontend trabalhar com mocks.
+5. Prefixo `/api` e recursos em inglês (`/api/students`).
+
+**Ajustes do desenvolvedor incorporados ao plano:**
+- Mensagem de e-mail duplicado **não reproduz o e-mail**.
+- `DataIntegrityViolationException` só vira 409 quando for a violação da constraint `uk_students_email`. Qualquer outra violação de integridade continua sendo erro interno (500).
+- Normalização **antes** da validação (as regras valem para o valor normalizado). Telefone ausente, `null`, `""` ou só espaços → `null`.
+- Ordenação com **lista explícita** de campos (`fullName`, `email`, `birthDate`, `createdAt`). Campo fora da lista → 400. Desempate estável por `id,asc`.
+- Formato exato das respostas e tipos TypeScript documentados no contrato.
+
+**Passos:**
+- [x] **Passo 1 — Contrato da API:** [API_CONTRACT.md](API_CONTRACT.md) v1.0.0 aprovado pelo desenvolvedor e commitado na branch `docs/students-api-contract` (`docs: add students API contract v1.0.0`). Aguardando push, PR e merge (cada um com autorização).
+- [ ] Passo 2 — Flyway, `V1__create_students_table.sql`, `ddl-auto=validate`.
+- [ ] Passo 3 — Entidade `Student`/`StudentStatus`, `StudentRepository` e `StudentRepositoryTest`.
+- [ ] Passo 4 — DTOs, `StudentService`, `DuplicateResourceException` e `StudentServiceTest`.
+- [ ] Passo 5 — `StudentController`, paginação, `CorsConfig`, novos tratamentos no handler e `StudentControllerTest`.
+- [ ] Passo 6 — `StudentApiIntegrationTest`, validação manual no Swagger e documentação final.
+
+**A confirmar na implementação (registrado no contrato):** comportamento para `page` negativo e `size` < 1 ou não numérico. O padrão do Spring é substituir pelo valor padrão.
+
 ## Estado atual do código
 ```
 src/main/java/com/fitmanager/api
@@ -77,7 +110,7 @@ Ainda não há entidades, controllers de produção, services nem repositories.
 
 ## Pontos de atenção pendentes
 1. **403 × 500 (Etapa 7):** o handler genérico de `Exception` vai capturar `AccessDeniedException`/`AuthenticationException` do Spring Security e devolver 500. Tratar ao adicionar a segurança.
-2. **Mensagens de validação (Etapa 3):** as mensagens padrão do Bean Validation dependem do idioma da JVM. Proposta: `message` explícita em português nos DTOs.
+2. **Mensagens de validação:** decidido — `message` explícita em português nos DTOs (texto exato definido no `API_CONTRACT.md`). Será aplicado no Passo 4 da Etapa 3.
 3. **Swagger em produção:** desabilitar `springdoc.api-docs.enabled` e `springdoc.swagger-ui.enabled` no futuro perfil `prod`.
 4. **Perfil `prod`:** ainda não existe (necessário no deploy).
 5. **`pom.xml`:** `<name/>`, `<description/>`, `<licenses>`, `<developers>`, `<scm>` vazios (padrão do Initializr).
@@ -100,6 +133,12 @@ Ainda não há entidades, controllers de produção, services nem repositories.
 | 2026-11-24 | Flyway na Etapa 3 | Instalar junto com a primeira migration (YAGNI) |
 | 2026-11-24 | Mapeamento DTO ↔ entidade manual | Poucas entidades; código explícito; reavaliar MapStruct depois |
 | 2026-11-24 | Spring Security + JWT (resource server) na Etapa 7 | Gerenciado pelo Boot, stateless, adequado a SPA |
+| 2026-11-24 | Alunos desativados, sem `DELETE` | Preserva fichas e histórico (Etapas 5 e 6) |
+| 2026-11-24 | Id `Long` (identity) | Simples e eficiente; a previsibilidade do id é tratada pela autenticação |
+| 2026-11-24 | `status` como `VARCHAR` + `@Enumerated(STRING)` + `CHECK` | Evita o bug do `ORDINAL` ao reordenar o enum |
+| 2026-11-24 | E-mail único, normalizado em minúsculas | Unicidade sem diferenciar maiúsculas; constraint no banco cobre condições de corrida |
+| 2026-11-24 | Contract-first (`API_CONTRACT.md`) | Backend e frontend em paralelo sem bloqueio |
+| 2026-11-24 | Paginação `VIA_DTO` (`content` + `page`), `size` máx. 100, desempate por `id` | Formato estável recomendado pelo Spring Data; proteção contra páginas enormes; ordem determinística |
 
 ## Compatibilidade verificada
 - Gerenciadas pelo BOM do Spring Boot 4.2.0: Spring Framework 7.1.0, Flyway 12.11.0, Testcontainers 2.0.5, Hibernate 7.4.15, Hibernate Validator 9.1.6, Jackson 3.1.8, JUnit Jupiter 6.1.3, driver PostgreSQL 42.7.14.
@@ -107,5 +146,6 @@ Ainda não há entidades, controllers de produção, services nem repositories.
 - Mudanças do Boot 4 a lembrar: `@WebMvcTest`/`@AutoConfigureMockMvc` em `org.springframework.boot.webmvc.test.autoconfigure`; Jackson 3 (`tools.jackson`); Testcontainers 2 (`org.testcontainers.postgresql.PostgreSQLContainer`).
 
 ## Próximos passos (aguardando autorização)
-1. Push da `feat/api-base` e merge na `main` (cada um só com autorização).
-2. Planejar a **Etapa 3 — Alunos** (Flyway + primeira migration, entidade, DTOs, CRUD, validação, testes).
+1. Push e PR da branch `docs/students-api-contract` para a `main` (cada um com autorização).
+2. Após o merge: fast-forward da `feat/students-backend` (e, a critério do desenvolvedor, da `feat/frontend-base`) a partir da `main`.
+3. Passo 2 da Etapa 3 (Flyway), somente com autorização.
