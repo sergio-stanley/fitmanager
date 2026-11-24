@@ -29,15 +29,19 @@ Comandos Maven rodam dentro de `fitmanager/fitmanager/` (usar `./mvnw`).
 - Controllers finos: só HTTP e validação de entrada. Regra de negócio fica no service.
 - **Nunca expor entidades JPA na API**: usar DTOs (preferencialmente `record`).
 - Validação com Bean Validation (`@Valid`) nos DTOs de entrada.
-- Tratamento de erros centralizado com `@RestControllerAdvice`, com respostas de erro padronizadas.
-- Injeção de dependência por construtor. Sem `@Autowired` em campo.
-- Schema do banco versionado por migrations (Flyway, a confirmar antes da primeira entidade); `ddl-auto` nunca em `create`/`update` em produção.
+- Tratamento de erros centralizado em `exception/GlobalExceptionHandler` (ProblemDetail, RFC 9457). Novos erros de negócio: criar exceção de domínio e tratá-la lá, sempre retornando via `handleExceptionInternal` (é onde o `instance` é preenchido). Nunca expor stack trace ou mensagem de exceção interna ao cliente.
+- Injeção de dependência por construtor no código de produção. Sem `@Autowired` em campo (aceitável apenas em classes de teste).
+- Schema do banco versionado por migrations **Flyway** (a partir da Etapa 3); `ddl-auto` nunca em `create`/`update`.
 - Configuração por perfis (`dev`, `prod`) e variáveis de ambiente.
 - Código limpo e SOLID, nomes em inglês no código e mensagens/documentação em português.
 
 ## Testes
-- JUnit 5. Testes unitários para services; `@WebMvcTest` para controllers; `@DataJpaTest` para repositories.
-- Toda funcionalidade nova entra com testes. Rodar `./mvnw test` antes de dar a etapa por concluída.
+- JUnit 6 (Jupiter). Testes unitários para services; `@WebMvcTest` para controllers; `@DataJpaTest` para repositories.
+- Banco nos testes: **Testcontainers** (`TestcontainersConfiguration` + `@Import`). **Não usar H2.** Os testes não podem depender do `.env` nem do `fitmanager-db`.
+- Controllers usados só em testes ficam aninhados na classe de teste — nunca endpoints fictícios em `src/main`.
+- Mensagens de validação explícitas (`message = "..."`) para não depender do idioma da JVM.
+- Spring Boot 4: `@WebMvcTest`/`@AutoConfigureMockMvc` ficam em `org.springframework.boot.webmvc.test.autoconfigure`; Jackson 3 (`tools.jackson`); Testcontainers 2 (`org.testcontainers.postgresql.PostgreSQLContainer`). Conferir a API real antes de seguir tutoriais de Boot 3.
+- Toda funcionalidade nova entra com testes. Rodar `.\mvnw.cmd test` (Docker Desktop aberto) antes de dar a etapa por concluída.
 
 ## Git
 - Commits pequenos, mensagens no padrão Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).

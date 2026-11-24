@@ -11,14 +11,15 @@ Sistema Full Stack de gerenciamento de academias, com qualidade profissional, pa
 | Banco | PostgreSQL |
 | Persistência | Spring Data JPA |
 | Validação | Bean Validation |
-| Testes | JUnit 5 (+ Spring Boot Test) |
-| Documentação da API | Swagger/OpenAPI (a adicionar) |
+| Testes | JUnit 6 (Jupiter), Spring Boot Test, MockMvc, Testcontainers |
+| Documentação da API | springdoc-openapi (Swagger UI, OpenAPI 3.1) |
+| Migrations | Flyway (a partir da Etapa 3) |
 | Frontend | React, TypeScript, Tailwind CSS (a criar) |
 | Infra | Docker, Git/GitHub |
 | Deploy | Render (backend) e Vercel (frontend) |
 
-Dependências hoje no `pom.xml`: `spring-boot-starter-webmvc`, `-data-jpa`, `-validation`, `spring-boot-devtools`, driver `postgresql` e starters de teste (`data-jpa-test`, `validation-test`, `webmvc-test`).
-Pendentes: Swagger/OpenAPI, Spring Security, migrations (Flyway), Dockerfile da aplicação. (O PostgreSQL já roda via `docker-compose.yml`.)
+Dependências hoje no `pom.xml`: `spring-boot-starter-webmvc`, `-data-jpa`, `-validation`, `spring-boot-devtools`, driver `postgresql`, `springdoc-openapi-starter-webmvc-ui` 3.2.1 e, para testes, `data-jpa-test`, `validation-test`, `webmvc-test`, `spring-boot-testcontainers` e `testcontainers-postgresql`.
+Pendentes: Flyway (Etapa 3), Spring Security (Etapa 7), Dockerfile da aplicação (Etapa 10). O PostgreSQL de desenvolvimento já roda via `docker-compose.yml`.
 
 ## Escopo (funcionalidades planejadas)
 1. Autenticação e controle de acesso (perfis, ex.: ADMIN e INSTRUTOR).
@@ -48,13 +49,13 @@ com.fitmanager.api
 
 Princípios: SOLID, código limpo, DTOs separados das entidades, injeção por construtor, sem complexidade desnecessária.
 
-## Planejamento por etapas (proposta, sujeita à aprovação)
-| # | Etapa | Resultado esperado |
-|---|---|---|
-| 0 | Documentação inicial | Os 4 arquivos de docs |
-| 1 | Ambiente e banco | PostgreSQL (Docker Compose), perfis `dev`, app subindo conectada ao banco |
-| 2 | Base da API | Estrutura de pacotes, tratamento global de erros, Swagger/OpenAPI |
-| 3 | Alunos | CRUD completo com validação e testes |
+## Planejamento por etapas
+| # | Etapa | Resultado esperado | Status |
+|---|---|---|---|
+| 0 | Documentação inicial | Os 4 arquivos de docs | ✅ |
+| 1 | Ambiente e banco | PostgreSQL (Docker Compose), perfil `dev`, app subindo conectada ao banco | ✅ |
+| 2 | Base da API | Swagger/OpenAPI, tratamento global de erros (ProblemDetail), Testcontainers e testes | ✅ (commitada; aguardando push/merge) |
+| 3 | Alunos | Flyway + primeira migration, CRUD completo com validação e testes | |
 | 4 | Exercícios | CRUD completo com testes |
 | 5 | Fichas de treino | Relacionamento aluno–exercícios, regras e testes |
 | 6 | Evolução | Registro e consulta do histórico do aluno |
@@ -63,9 +64,10 @@ Princípios: SOLID, código limpo, DTOs separados das entidades, injeção por c
 | 9 | Frontend | React + TS + Tailwind consumindo a API |
 | 10 | Docker e deploy | Dockerfile, CI, deploy em Render e Vercel |
 
-## Decisões em aberto (a discutir)
-- Migrations: Flyway vs. `ddl-auto` no início.
-- Autenticação: JWT stateless (provável) vs. sessão.
-- Testes de repositório: Testcontainers (fiel ao PostgreSQL) vs. H2.
-- Mapeamento DTO ↔ entidade: manual vs. MapStruct.
-- Estrutura do repositório: monorepo (`fitmanager/` + `frontend/`) é a proposta atual.
+## Decisões tomadas (detalhes e justificativas em `PROGRESS.md`)
+- Migrations: **Flyway**, instalado na Etapa 3 junto com a primeira tabela.
+- Banco nos testes: **Testcontainers com PostgreSQL**; H2 não será usado.
+- Erros: **ProblemDetail (RFC 9457)** via `@RestControllerAdvice`.
+- Mapeamento DTO ↔ entidade: **manual** por enquanto (reavaliar MapStruct se ficar repetitivo).
+- Autenticação: **Spring Security + JWT** (resource server) na Etapa 7.
+- Repositório: **monorepo** (`fitmanager/` + futuro `frontend/`).
