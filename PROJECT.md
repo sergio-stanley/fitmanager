@@ -13,13 +13,13 @@ Sistema Full Stack de gerenciamento de academias, com qualidade profissional, pa
 | Validação | Bean Validation |
 | Testes | JUnit 6 (Jupiter), Spring Boot Test, MockMvc, Testcontainers |
 | Documentação da API | springdoc-openapi (Swagger UI, OpenAPI 3.1) |
-| Migrations | Flyway (a partir da Etapa 3) |
-| Frontend | React, TypeScript, Tailwind CSS (a criar) |
+| Migrations | Flyway |
+| Frontend | React, TypeScript, Tailwind CSS (em desenvolvimento pelo agente frontend) |
 | Infra | Docker, Git/GitHub |
 | Deploy | Render (backend) e Vercel (frontend) |
 
-Dependências hoje no `pom.xml`: `spring-boot-starter-webmvc`, `-data-jpa`, `-validation`, `spring-boot-devtools`, driver `postgresql`, `springdoc-openapi-starter-webmvc-ui` 3.2.1 e, para testes, `data-jpa-test`, `validation-test`, `webmvc-test`, `spring-boot-testcontainers` e `testcontainers-postgresql`.
-Pendentes: Flyway (Etapa 3), Spring Security (Etapa 7), Dockerfile da aplicação (Etapa 10). O PostgreSQL de desenvolvimento já roda via `docker-compose.yml`.
+Dependências hoje no `pom.xml`: `spring-boot-starter-webmvc`, `-data-jpa`, `-validation`, `-flyway`, `flyway-database-postgresql`, `spring-boot-devtools`, driver `postgresql`, `springdoc-openapi-starter-webmvc-ui` 3.2.1 e, para testes, `data-jpa-test`, `validation-test`, `webmvc-test`, `spring-boot-testcontainers` e `testcontainers-postgresql`.
+Pendentes: Spring Security (Etapa 7), Dockerfile da aplicação (Etapa 10). O PostgreSQL de desenvolvimento roda via `docker-compose.yml`.
 
 ## Escopo (funcionalidades planejadas)
 1. Autenticação e controle de acesso (perfis, ex.: ADMIN e INSTRUTOR).
@@ -54,18 +54,20 @@ Princípios: SOLID, código limpo, DTOs separados das entidades, injeção por c
 |---|---|---|---|
 | 0 | Documentação inicial | Os 4 arquivos de docs | ✅ |
 | 1 | Ambiente e banco | PostgreSQL (Docker Compose), perfil `dev`, app subindo conectada ao banco | ✅ |
-| 2 | Base da API | Swagger/OpenAPI, tratamento global de erros (ProblemDetail), Testcontainers e testes | ✅ (commitada; aguardando push/merge) |
-| 3 | Alunos | Flyway + primeira migration, CRUD completo com validação e testes | |
+| 2 | Base da API | Swagger/OpenAPI, tratamento global de erros (ProblemDetail), Testcontainers e testes | ✅ (PR #1) |
+| 3 | Alunos | Contrato da API, Flyway + V1, entidade, repository, DTOs, service, controller, CORS e testes | ✅ backend (contrato no PR #2; implementação commitada em `feat/students-backend`, aguardando push/PR) |
 | 4 | Exercícios | CRUD completo com testes |
 | 5 | Fichas de treino | Relacionamento aluno–exercícios, regras e testes |
 | 6 | Evolução | Registro e consulta do histórico do aluno |
 | 7 | Autenticação | Spring Security + JWT, perfis e autorização |
 | 8 | Dashboard (API) | Endpoints de indicadores |
-| 9 | Frontend | React + TS + Tailwind consumindo a API |
+| 9 | Frontend | React + TS + Tailwind consumindo a API | 🔄 em paralelo (agente frontend, branch `feat/frontend-base`) |
 | 10 | Docker e deploy | Dockerfile, CI, deploy em Render e Vercel |
 
 ## Decisões tomadas (detalhes e justificativas em `PROGRESS.md`)
-- Migrations: **Flyway**, instalado na Etapa 3 junto com a primeira tabela.
+- Migrations: **Flyway** (V1 = tabela `students`); `ddl-auto=validate`.
+- Integração backend/frontend: **contract-first** via `API_CONTRACT.md`.
+- Alunos: **desativação** em vez de exclusão; e-mail único normalizado; CPF fora do escopo.
 - Banco nos testes: **Testcontainers com PostgreSQL**; H2 não será usado.
 - Erros: **ProblemDetail (RFC 9457)** via `@RestControllerAdvice`.
 - Mapeamento DTO ↔ entidade: **manual** por enquanto (reavaliar MapStruct se ficar repetitivo).

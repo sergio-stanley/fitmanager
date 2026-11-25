@@ -28,12 +28,22 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final URI ABOUT_BLANK = URI.create("about:blank");
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Object> handleResourceNotFound(ResourceNotFoundException ex, WebRequest request) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Recurso não encontrado");
         return handleExceptionInternal(ex, problem, new HttpHeaders(), HttpStatus.NOT_FOUND, request);
+    }
+
+    /** 409 com o campo afetado em "errors", para o frontend exibir junto ao campo (API_CONTRACT.md, seção 2.9). */
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<Object> handleDuplicateResource(DuplicateResourceException ex, WebRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Conflito");
+        problem.setProperty("errors", List.of(new FieldViolation(ex.getField(), ex.getMessage())));
+        return handleExceptionInternal(ex, problem, new HttpHeaders(), HttpStatus.CONFLICT, request);
     }
 
     @Override
@@ -63,8 +73,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * Ponto único por onde passam todas as respostas de erro: preenche "instance" com o caminho
-     * da requisição. getRequestURI() não inclui a query string, que pode conter dados sensíveis.
+     * Ponto único por onde passam todas as respostas de erro: preenche "type" e "instance".
+     * getRequestURI() não inclui a query string, que pode conter dados sensíveis.
      */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
@@ -75,9 +85,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 : (body == null && ex instanceof ErrorResponse errorResponse) ? errorResponse.getBody()
                 : null;
 
-        if (problem != null && problem.getInstance() == null
-                && request instanceof ServletWebRequest servletRequest) {
-            problem.setInstance(URI.create(servletRequest.getRequest().getRequestURI()));
+        if (problem != null) {
+            // No Spring 7, type nulo é omitido do JSON; o contrato exige "type" sempre presente.
+            if (problem.getType() == null) {
+                problem.setType(ABOUT_BLANK);
+            }
+            if (problem.getInstance() == null && request instanceof ServletWebRequest servletRequest) {
+                problem.setInstance(URI.create(servletRequest.getRequest().getRequestURI()));
+            }
         }
         return super.handleExceptionInternal(ex, body, headers, status, request);
     }
