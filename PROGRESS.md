@@ -1,6 +1,6 @@
 # PROGRESS.md — Andamento do FitManager
 
-Última atualização: 2026-11-24
+Última atualização: 2026-11-25
 
 ## Resumo
 | Etapa | Status |
@@ -8,14 +8,17 @@
 | 0 — Documentação inicial | ✅ Concluída |
 | 1 — Ambiente e banco | ✅ Concluída (commit `03787bb`, no GitHub) |
 | 2 — Base da API | ✅ Concluída — PR #1 integrado na `main` (merge `024d9e3`) |
-| 3 — Alunos (backend) | ✅ Concluída — contrato no PR #2; implementação (Passos 2 a 6, 105 testes, validação manual no Swagger) commitada em `feat/students-backend`, **aguardando push e PR** |
+| 3 — Alunos (backend) | ✅ Concluída — contrato no PR #2 (`d44dbf8`); implementação `cd188cf` (105 testes, validação manual no Swagger) integrada pelo **PR #3** (merge `32e2619`) |
+| 4 — Exercícios (backend) | 🔄 Em andamento — plano aprovado (opção A); Passo 1 (contrato v1.1.0) aprovado e commitado na branch `docs/exercises-api-contract`, aguardando push/PR |
 
 ## Repositório
 - GitHub (público): https://github.com/sergio-stanley/fitmanager (`origin`).
-- `main` = `origin/main`: `d44dbf8` — *Merge pull request #2 from sergio-stanley/docs/students-api-contract* (contém `a078044`, contrato v1.0.0; `024d9e3`, merge do PR #1 / Etapa 2; `03787bb`, Etapa 1).
-- `feat/api-base` (`1d146e8`) e `docs/students-api-contract` (`a078044`): integradas; mantidas local e remotamente até decisão do desenvolvedor.
-- `feat/students-backend`: atualizada por fast-forward para `d44dbf8`; branch do backend da Etapa 3 (worktree principal).
-- `feat/frontend-base`: criada pelo desenvolvedor via Orca, em worktree separada (`C:\Users\sstan\orca\workspaces\fitmanager\feat-frontend-base`). Tem commit próprio de scaffold do frontend (`chore(frontend): scaffold React TypeScript and Vite...`, só em `frontend/`) a partir de `024d9e3` — o hash é gerenciado pelo agente frontend e pode mudar; ainda não contém o contrato (precisa de merge/rebase da `main`, a critério do desenvolvedor).
+- `main` = `origin/main`: `32e2619` — *Merge pull request #3 from sergio-stanley/feat/students-backend* (contém `cd188cf`, módulo de alunos; `d44dbf8`, merge do PR #2 / contrato v1.0.0; `024d9e3`, merge do PR #1 / Etapa 2; `03787bb`, Etapa 1).
+- `feat/api-base` (`1d146e8`), `docs/students-api-contract` (`a078044`) e `feat/students-backend` (`cd188cf`): integradas; mantidas local e remotamente até decisão do desenvolvedor.
+- `docs/exercises-api-contract`: criada a partir de `32e2619` só para o PR do contrato v1.1.0 (`API_CONTRACT.md`, `PROJECT.md`, este arquivo).
+- `feat/exercises-backend`: criada a partir de `32e2619`; branch da implementação da Etapa 4 (ainda sem alterações).
+- `feat/frontend-base`: criada pelo desenvolvedor via Orca, em worktree separada (`C:\Users\sstan\orca\workspaces\fitmanager\feat-frontend-base`), gerenciada pelo agente frontend (commits só em `frontend/`; o hash muda conforme ele trabalha). Não é sincronizada pelo agente backend.
+- `backup/frontend-f1` (`d3207d5`): branch local de backup do scaffold anterior do frontend, criada fora do agente backend; preservada.
 
 ## Desenvolvimento em paralelo (dois agentes)
 - **Agente backend:** worktree principal, branches `feat/students-backend` e de documentação. É o **único** que edita os arquivos da raiz: `PROGRESS.md`, `PROJECT.md`, `README.md`, `CLAUDE.md` e `API_CONTRACT.md`.
@@ -86,7 +89,7 @@
 
 **Passos:**
 - [x] **Passo 1 — Contrato da API:** [API_CONTRACT.md](API_CONTRACT.md) v1.0.0 (`a078044`), integrado na `main` pelo **PR #2** (merge `d44dbf8`).
-- [x] **Passo 2 — Flyway e migração inicial** (branch `feat/students-backend`, sem commit):
+- [x] **Passo 2 — Flyway e migração inicial** (branch `feat/students-backend`, commit `cd188cf`, PR #3):
   - Dependências `spring-boot-starter-flyway` e `flyway-database-postgresql`, sem versão no `pom.xml` (BOM: Spring Boot 4.2.0, Flyway 12.11.0).
   - `db/migration/V1__create_students_table.sql`: `pk_students`, `uk_students_email`, `ck_students_status`, `NOT NULL` em todos os campos exceto `phone`, id `GENERATED ALWAYS AS IDENTITY`. Duas constraints a mais que a modelagem original: `ck_students_email_lowercase` (garante no banco a unicidade sem diferenciar maiúsculas) e `ck_students_phone_digits` (10 ou 11 dígitos, como no contrato).
   - `spring.jpa.hibernate.ddl-auto` de `none` para `validate`.
@@ -95,7 +98,7 @@
   - **Resultado real** (sem variáveis `DB_*`): `Tests run: 19, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`. A primeira execução teve 2 falhas, ambas erros do próprio teste (o valor de telefone com máscara excedia o `VARCHAR(11)` antes do `CHECK`; a mensagem do id manual fica na causa raiz da exceção). O schema não foi alterado para fazer os testes passarem.
   - Banco de desenvolvimento **não foi tocado**: `fitmanager-db` continua com 0 tabelas em `public`; volume `fitmanager_fitmanager-data` preservado. Nenhum `flyway clean`, `DROP TABLE` ou `baseline-on-migrate`. A V1 será aplicada no `fitmanager-db` no próximo `spring-boot:run` (schema vazio, sem necessidade de baseline).
   - Aprovado pelo desenvolvedor, incluindo as duas constraints extras.
-- [x] **Passo 3 — Entidade e repository** (branch `feat/students-backend`, sem commit):
+- [x] **Passo 3 — Entidade e repository** (branch `feat/students-backend`, commit `cd188cf`, PR #3):
   - `entity/StudentStatus` (`ACTIVE`, `INACTIVE`) e `entity/Student`: `@Entity`/`@Table("students")`, id `IDENTITY`, `@Enumerated(STRING)`, nomes e tamanhos de coluna explícitos, `created_at` com `updatable = false`. Construtor `protected` para o JPA; construtor público que sempre cria como `ACTIVE`; métodos de domínio `updateData(...)` e `changeStatus(...)`; apenas getters públicos; sem Lombok.
   - Timestamps por `@PrePersist`/`@PreUpdate` (JPA padrão): um único instante na criação (`createdAt == updatedAt`), truncado em microssegundos (precisão do `TIMESTAMPTZ`), para o valor em memória ser igual ao lido do banco. `@PreUpdate` só dispara se a entidade mudou: repetir o status atual não altera `updatedAt`.
   - `repository/StudentRepository` (`JpaRepository<Student, Long>`): `existsByEmail`, `existsByEmailAndIdNot` (derivadas do nome) e `search(pattern, status, pageable)` em JPQL (trecho do nome **ou** e-mail sem diferenciar maiúsculas; `status` nulo = todos). `containsPattern(text)` normaliza o texto e **escapa os curingas do LIKE** (`%`, `_`, `\`), para que a busca seja literal, como diz o contrato.
@@ -104,7 +107,7 @@
   - **Migration V1 preservada:** não foi alterada neste passo; nenhuma mudança estrutural foi necessária.
   - **Resultado real** (sem variáveis `DB_*`): `Tests run: 36, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`. Banco de desenvolvimento continua com 0 tabelas.
   - Aprovado pelo desenvolvedor.
-- [x] **Passo 4 — DTOs e service** (branch `feat/students-backend`, sem commit):
+- [x] **Passo 4 — DTOs e service** (branch `feat/students-backend`, commit `cd188cf`, PR #3):
   - `dto/StudentRequest` (record): **construtor compacto normaliza** (nome: `strip` + espaços internos únicos; e-mail: `strip` + minúsculas com `Locale.ROOT`; telefone: ausente/`""`/espaços → `null`, máscara não removida). O Jackson cria o record antes do Bean Validation, então as regras valem para o valor normalizado. Anotações com as **mensagens exatas do contrato**.
   - `dto/StudentStatusRequest` (record, `@NotNull` com `O status é obrigatório`) e `dto/StudentResponse` (record + `from(Student)`, mapeamento manual).
   - `exception/DuplicateResourceException`: mensagem genérica `Já existe um aluno cadastrado com este e-mail.` (nunca o e-mail) + campo `field = "email"` para o item `errors` do 409 no Passo 5.
@@ -119,7 +122,7 @@
   - Migration V1 inalterada (checksum `e03ad24cb9ff05cf`).
   - **Resultado real** (sem variáveis `DB_*`): `Tests run: 67, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.
   - Aprovado pelo desenvolvedor.
-- [x] **Passo 5 — Controller, paginação, CORS e erros** (branch `feat/students-backend`, sem commit):
+- [x] **Passo 5 — Controller, paginação, CORS e erros** (branch `feat/students-backend`, commit `cd188cf`, PR #3):
   - `controller/StudentController` (`/api/students`): `POST` → **201** + `Location: /api/students/{id}`; `GET /{id}`; `GET` paginado; `PUT /{id}`; `PATCH /{id}/status`. `@Valid @RequestBody` nos corpos. Sem `DELETE` (→ 405).
   - Paginação: resposta `PagedModel` (`{ content, page }`, formato `VIA_DTO`) + `spring.data.web.pageable.serialization-mode=via-dto`, `default-page-size=20`, `max-page-size=100` (propriedades do Boot, e não `@EnableSpringDataWebSupport`, que desligaria a auto-configuração e os limites). `@PageableDefault(sort = "fullName", ASC)`.
   - Ordenação: lista explícita `fullName`, `email`, `birthDate`, `createdAt`; qualquer outro campo (incluindo `id`), direção inválida (ex.: `fullName,up`, que o Spring interpreta como campo `up`) ou `ignorecase` → **400**. Desempate por `id` continua no service.
@@ -152,6 +155,30 @@
   - Commit autorizado: `feat: implement student management API with PostgreSQL persistence` (sem push).
 
 **A confirmar na implementação (registrado no contrato):** comportamento para `page` negativo e `size` < 1 ou não numérico. O padrão do Spring é substituir pelo valor padrão.
+
+## Etapa 4 — Exercícios / backend (em andamento)
+**Plano aprovado em 2026-11-25.** Decisões:
+1. **Opção A:** um grupo muscular **principal** por exercício, de uma lista fixa (enum `MuscleGroup`). Mudar a lista exige nova migration e nova versão minor do contrato.
+2. Valores do enum: `CHEST`, `BACK`, `SHOULDERS`, `BICEPS`, `TRICEPS`, `FOREARMS`, `ABS`, `QUADRICEPS`, `HAMSTRINGS`, `GLUTES`, `CALVES`, `FULL_BODY`, `CARDIO`, `OTHER` (rótulos pt-BR sugeridos no contrato, seção 6.1). `OTHER` foi incluído para mobilidade/alongamento e outros casos, evitando classificar um exercício errado só por falta de opção.
+3. Mesmo padrão do módulo de alunos: desativação em vez de exclusão, `POST` 201 + `Location`, `PUT`, `PATCH /status` idempotente, paginação `content`/`page`, ordenação por lista explícita com desempate por `id`, 409 sem expor o valor duplicado.
+4. Nome único **sem diferenciar maiúsculas**, mas com a **grafia original preservada** (diferente do e-mail, que é gravado em minúsculas). Na V2, isso será um índice único sobre `lower(name)` (`uk_exercises_name`).
+5. `description` opcional (até 500 caracteres; vazio → `null`). Equipamento, mídia e exercícios por instrutor ficam fora do escopo.
+6. Contrato publicado antes da implementação, em PR separado, para o frontend trabalhar com mocks.
+
+**Aprovado pelo desenvolvedor (2026-11-25):** contrato v1.1.0; os 14 grupos musculares, incluindo `OTHER`; separação entre ficha planejada e sessão realizada; preservação do histórico de evolução; várias fichas ativas por aluno; desativação de exercícios em vez de exclusão; `.gitattributes` com `*.sql text eol=lf` (implementação e validação do Flyway no Passo 2, sem alterar o conteúdo da V1).
+
+**Decisão provisória (desenvolvedor, 2026-11-25):** antecipar a **autenticação** para antes da implementação das fichas de treino. A confirmar após a conclusão da Etapa 4; a Etapa 4 segue sem alteração.
+
+**Definição de produto registrada (desenvolvedor, 2026-11-25):** três modalidades de treino — do professor, personalizado e livre — e nenhum aluno limitado a divisões predefinidas ou a determinados exercícios. Detalhes, consequências para fichas, sessões, histórico e permissões em [PROJECT.md](PROJECT.md#modalidades-de-treino-definição-do-produto--2026-11-25). **Nada disso foi implementado.**
+
+**Passos:**
+- [x] **Passo 1 — Contrato da API v1.1.0** (branch `docs/exercises-api-contract`, commit `docs: add exercises API contract v1.1.0 and workout planning`, sem push): seção 6 nova (grupos musculares, modelo, normalização, validações com mensagens, endpoints, listagem com `search`/`muscleGroup`/`status`/paginação/ordenação, edição, status, 409 de nome, tipos TypeScript, mocks); tabela de erros 3.3 com os casos de exercício; seção 2.6 com o comportamento de `page`/`size` confirmado em testes, no lugar da nota "a confirmar" (sem mudança de comportamento na seção de alunos). 15 blocos JSON validados. `PROJECT.md` atualizado com as modalidades de treino e o replanejamento das Etapas 4 a 7. Na revisão pré-commit, a seção 6.1 foi tornada precisa sobre a compatibilidade do enum com o TypeScript (inclusão de valor é aditiva no JSON, mas o tipo `MuscleGroup` é fechado; leitura defensiva com `muscleGroupLabel`, que devolve o próprio valor quando desconhecido). Aprovado pelo desenvolvedor.
+- [ ] Passo 2 inclui também: `.gitattributes` na raiz com `*.sql text eol=lf` e confirmação de que o checksum da V1 no Flyway continua válido.
+- [ ] Passo 2 — Migration `V2__create_exercises_table.sql`.
+- [ ] Passo 3 — Entidade `Exercise`/`MuscleGroup`, `ExerciseRepository` e testes.
+- [ ] Passo 4 — DTOs, `ExerciseService` (com extração dos utilitários compartilhados de LIKE e de constraint de unicidade, protegidos pelos testes de alunos) e testes.
+- [ ] Passo 5 — `ExerciseController`, tratamento de erros e testes.
+- [ ] Passo 6 — Integração ponta a ponta, validação manual no Swagger e documentação.
 
 ## Estado atual do código
 ```
@@ -198,6 +225,7 @@ API de alunos completa (V1, entidade, repository, DTOs, service, controller, COR
 15. ~~Pendências da camada HTTP~~ — **resolvidas no Passo 5** (ordenação, `search`, `size`, `VIA_DTO`).
 16. **CORS em produção:** definir `APP_CORS_ALLOWED_ORIGINS` com o domínio da Vercel no deploy (Etapa 10).
 17. **Mensagens técnicas em inglês nos 400 genéricos** (ordenação inválida usa mensagem própria em português; `search` > 100, enum inválido, JSON malformado vêm do Spring). Previsto no contrato (seção 3.3: `detail` não exibível nesses casos).
+18. **Fim de linha das migrations:** com `core.autocrlf=true`, o Git grava a `V1` com CRLF na cópia de trabalho (conteúdo idêntico ao commit; checksum sem CR = `e03ad24cb9ff05cf`). O checksum do Flyway (`2140455015` no `fitmanager-db`) é calculado linha a linha e não deveria mudar — **confirmar no Passo 2 da Etapa 4**, quando a aplicação validar a V1 ao subir. Solução **aprovada**: `.gitattributes` na raiz com `*.sql text eol=lf`, a implementar no Passo 2 (sem alterar o conteúdo da V1).
 
 ## Decisões técnicas
 | Data | Decisão | Motivo |
@@ -227,6 +255,6 @@ API de alunos completa (V1, entidade, repository, DTOs, service, controller, COR
 - Mudanças do Boot 4 a lembrar: `@WebMvcTest`/`@AutoConfigureMockMvc` em `org.springframework.boot.webmvc.test.autoconfigure`; Jackson 3 (`tools.jackson`); Testcontainers 2 (`org.testcontainers.postgresql.PostgreSQLContainer`).
 
 ## Próximos passos (aguardando autorização)
-1. Push da `feat/students-backend` e PR para a `main` (cada um com autorização).
-2. Opcional: contrato v1.0.1 removendo a nota "a confirmar" da seção 2.6 (comportamento já confirmado por testes).
-3. Planejar o próximo módulo (Etapa 4 — Exercícios), somente com autorização.
+1. Push e PR da branch `docs/exercises-api-contract` (cada um com autorização).
+2. Após o merge: atualizar a `feat/exercises-backend` a partir da `main` e iniciar o Passo 2 (`.gitattributes` + V2), somente com autorização.
+3. Ao concluir a Etapa 4: confirmar a decisão provisória de antecipar a autenticação e, se confirmada, revisar a numeração das etapas.

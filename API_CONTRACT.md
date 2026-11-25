@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Versão do contrato** | 1.0.0 |
-| **Status** | Aprovado para desenvolvimento com mocks. **Backend ainda não implementado** (Etapa 3). |
+| **Versão do contrato** | 1.1.0 |
+| **Status** | Alunos (seção 2): **implementado** no backend (Etapa 3). Exercícios (seção 6): aprovado para desenvolvimento com mocks, **backend ainda não implementado** (Etapa 4). |
 | **Responsável** | Agente backend (único que edita este arquivo) |
-| **Última atualização** | 2026-11-24 |
+| **Última atualização** | 2026-11-25 |
 
 > **Regra de mudança:** este contrato só muda por PR, com aumento de versão e registro no [Histórico de alterações](#histórico-de-alterações). Quando o backend estiver implementado, a especificação gerada em `/v3/api-docs` também ficará disponível. Se os dois divergirem, é um bug: reporte.
 
@@ -155,7 +155,7 @@ Resposta **200**: `Student`. Id inexistente → **404** (ver 3.2).
 
 Página além da última → **200** com `content: []`.
 
-> A confirmar nos testes da implementação (Passo 5): o comportamento exato para `page` negativo e `size` menor que 1 ou não numérico. O padrão do Spring é substituir pelo valor padrão. Se a implementação for diferente, este contrato será atualizado.
+**Valores fora da faixa ou não numéricos** (comportamento confirmado por testes automatizados): `page` negativo ou não numérico → `0`; `size` menor que 1 ou não numérico → `20`; `size` acima de 100 → `100`. Nenhum desses casos gera erro.
 
 Exemplo: `GET /api/students?search=ana&status=ACTIVE&page=0&size=20&sort=fullName,asc`
 
@@ -232,7 +232,7 @@ Todas as respostas de erro seguem a RFC 9457, com `Content-Type: application/pro
 | `status` | inteiro | sim | Igual ao status HTTP |
 | `detail` | string | ver 3.3 | Explicação |
 | `instance` | string | sim | Caminho da requisição, **sem query string** |
-| `errors` | `FieldViolation[]` | **não** | Presente apenas em 400 de validação e no 409 de e-mail |
+| `errors` | `FieldViolation[]` | **não** | Presente apenas em 400 de validação e nos 409 de duplicidade (e-mail de aluno, nome de exercício) |
 
 ### 3.1 Validação — 400
 ```json
@@ -266,10 +266,11 @@ Todas as respostas de erro seguem a RFC 9457, com `Content-Type: application/pro
 |---|---|---|---|---|
 | 400 | Validação de campos | `Dados inválidos` | sim | **sim** |
 | 400 | JSON malformado, data em formato errado, enum desconhecido, id não numérico, parâmetro inválido, campo de ordenação não permitido | variável | **não** — pode vir em inglês e técnico; exiba mensagem genérica | não |
-| 404 | Aluno inexistente | `Recurso não encontrado` | sim | não |
+| 404 | Aluno ou exercício inexistente | `Recurso não encontrado` | sim | não |
 | 404 | Rota inexistente | variável | não | não |
 | 405 | Método HTTP não suportado | variável | não | não |
-| 409 | E-mail duplicado | `Conflito` | sim | **sim** (`email`) |
+| 409 | E-mail de aluno duplicado | `Conflito` | sim | **sim** (`email`) |
+| 409 | Nome de exercício duplicado | `Conflito` | sim | **sim** (`name`) |
 | 415 | `Content-Type` diferente de JSON | variável | não | não |
 | 500 | Erro inesperado | `Erro interno` | sim (mensagem genérica) | não |
 
@@ -278,6 +279,8 @@ Todas as respostas de erro seguem a RFC 9457, com `Content-Type: application/pro
 ---
 
 ## 4. Tipos TypeScript
+
+Tipos comuns e de alunos abaixo. Os tipos de exercícios estão na [seção 6.9](#69-tipos-typescript-de-exercícios) e reutilizam `Page<T>`, `PageMetadata`, `SortDirection`, `FieldViolation` e `ProblemDetail` daqui.
 
 ```ts
 // Tipos do contrato v1.0.0 — manter sincronizado com API_CONTRACT.md
@@ -390,7 +393,309 @@ Os timestamps têm precisões diferentes de propósito, para o mock refletir a o
 
 ---
 
+## 6. Exercícios (`/api/exercises`)
+
+Catálogo de exercícios da academia. É a base para as fichas e os treinos das próximas etapas: qualquer exercício ativo do catálogo poderá ser usado em qualquer modalidade de treino, sem restrição por grupo muscular ou divisão de treino. As convenções gerais (seção 1), o formato de erros (seção 3) e o formato de página (seção 2.6) valem igualmente aqui.
+
+### 6.1 Grupos musculares (`MuscleGroup`)
+
+Cada exercício tem **um** grupo muscular **principal**, usado para organizar e filtrar o catálogo. Ele não restringe como o exercício será usado nos treinos.
+
+| Valor (API) | Rótulo sugerido (pt-BR) |
+|---|---|
+| `CHEST` | Peito |
+| `BACK` | Costas |
+| `SHOULDERS` | Ombros |
+| `BICEPS` | Bíceps |
+| `TRICEPS` | Tríceps |
+| `FOREARMS` | Antebraços |
+| `ABS` | Abdômen |
+| `QUADRICEPS` | Quadríceps |
+| `HAMSTRINGS` | Posteriores de coxa |
+| `GLUTES` | Glúteos |
+| `CALVES` | Panturrilhas |
+| `FULL_BODY` | Corpo inteiro |
+| `CARDIO` | Cardio |
+| `OTHER` | Outro (mobilidade, alongamento etc.) |
+
+- A API usa sempre o **valor** em maiúsculas. Os rótulos são responsabilidade do frontend; a tabela acima é a sugestão oficial.
+
+**Evolução da lista e compatibilidade com o TypeScript:**
+- Incluir um novo valor é uma mudança **aditiva** no JSON (nova versão *minor* do contrato, com aviso prévio por PR). **Remover ou renomear** um valor é uma mudança incompatível (nova versão *major*) e não está prevista.
+- O tipo `MuscleGroup` (seção 6.9) é uma **lista fechada** verificada apenas em tempo de compilação. Se o backend passar a devolver um valor novo antes de o frontend atualizar seus tipos, o código continuará compilando, mas receberá em tempo de execução um valor fora do tipo. Por isso, ao **ler respostas**, o frontend deve:
+  1. obter rótulos sempre por `muscleGroupLabel(valor)` (seção 6.9), que devolve o próprio valor quando ele é desconhecido;
+  2. não usar `switch`/mapeamentos exaustivos sem um caso padrão;
+  3. não descartar nem rejeitar itens com valor desconhecido (exibi-los normalmente, com o valor bruto como rótulo).
+- Ao **enviar requisições**, o frontend só usa os valores que conhece; o backend rejeita valores fora da lista com 400.
+- Ao receber uma nova versão *minor* que inclua valores, o frontend atualiza `MuscleGroup` e `MUSCLE_GROUP_LABELS`.
+
+### 6.2 Modelo `Exercise` (resposta)
+
+```json
+{
+  "id": 1,
+  "name": "Supino reto com barra",
+  "muscleGroup": "CHEST",
+  "description": "Deitado no banco, descer a barra até o peito e empurrar até estender os braços.",
+  "status": "ACTIVE",
+  "createdAt": "2026-11-25T14:02:11.482913Z",
+  "updatedAt": "2026-11-25T14:02:11.482913Z"
+}
+```
+
+| Campo | Tipo | Nulo? | Descrição |
+|---|---|---|---|
+| `id` | inteiro | não | Gerado pelo servidor |
+| `name` | string | não | Já normalizado (sem espaços nas pontas e sem espaços repetidos). **A grafia original é preservada** (maiúsculas e acentos). |
+| `muscleGroup` | `MuscleGroup` | não | Grupo muscular principal |
+| `description` | string | **sim** | Instruções de execução, ou `null` |
+| `status` | `"ACTIVE"` \| `"INACTIVE"` | não | |
+| `createdAt` | string (ISO-8601 UTC) | não | Gerado pelo servidor |
+| `updatedAt` | string (ISO-8601 UTC) | não | Atualizado pelo servidor a cada alteração |
+
+### 6.3 Corpo de criação e edição `ExerciseRequest`
+
+```json
+{
+  "name": "  Supino   reto com barra ",
+  "muscleGroup": "CHEST",
+  "description": "Deitado no banco, descer a barra até o peito e empurrar até estender os braços."
+}
+```
+
+**Normalização (feita pelo servidor ANTES da validação):**
+
+| Campo | Normalização |
+|---|---|
+| `name` | Remove espaços nas pontas e reduz espaços internos repetidos a um só (`"  Supino   reto "` → `"Supino reto"`). Maiúsculas e acentos são mantidos. |
+| `description` | Remove espaços nas pontas. **Ausente, `null`, `""` ou só espaços → `null`.** Quebras de linha internas são preservadas. |
+
+**Validação:**
+
+| Campo | Obrigatório | Regra | Mensagem (`errors[].message`) |
+|---|---|---|---|
+| `name` | sim | não vazio | `O nome é obrigatório` |
+| | | 3 a 100 caracteres | `O nome deve ter entre 3 e 100 caracteres` |
+| | | único no catálogo (ativos e inativos), **sem diferenciar maiúsculas** | → **409** (ver 6.8) |
+| `muscleGroup` | sim | presente | `O grupo muscular é obrigatório` |
+| | | um dos valores da seção 6.1 | valor desconhecido → **400 sem `errors`** (JSON ilegível) |
+| `description` | não | até 500 caracteres | `A descrição deve ter no máximo 500 caracteres` |
+
+Observações:
+- A unicidade compara o nome **normalizado e sem diferenciar maiúsculas**: `"Supino Reto"`, `"supino reto"` e `"  SUPINO   RETO "` são o mesmo exercício. **Acentos diferenciam**: `"Rosca alternada"` e `"Rosca alternáda"` são nomes distintos.
+- Um mesmo campo pode aparecer mais de uma vez em `errors`; a ordem dos itens não é garantida (como na seção 2.2).
+
+### 6.4 Endpoints
+
+| Método | Rota | Corpo | Sucesso | Erros possíveis |
+|---|---|---|---|---|
+| `POST` | `/api/exercises` | `ExerciseRequest` | **201** + `Exercise` + header `Location` | 400, 409, 415 |
+| `GET` | `/api/exercises/{id}` | — | **200** + `Exercise` | 400 (id não numérico), 404 |
+| `GET` | `/api/exercises` | — | **200** + `Page<Exercise>` | 400 |
+| `PUT` | `/api/exercises/{id}` | `ExerciseRequest` | **200** + `Exercise` | 400, 404, 409, 415 |
+| `PATCH` | `/api/exercises/{id}/status` | `ExerciseStatusRequest` | **200** + `Exercise` | 400, 404, 415 |
+
+Não existe `DELETE`: exercícios são **desativados** (`status: "INACTIVE"`), para que fichas e históricos que os usam continuem íntegros. Um exercício inativo continua acessível por `GET` e aparece na listagem quando o filtro de status não é informado.
+
+### 6.5 Criar exercício — `POST /api/exercises`
+
+Corpo `ExerciseRequest` (6.3). Novo exercício sempre nasce com `status: "ACTIVE"`.
+
+Resposta **201 Created**, com header `Location: /api/exercises/1` e o `Exercise` criado no corpo (exemplo em 6.2).
+
+### 6.6 Listar / pesquisar — `GET /api/exercises`
+
+**Parâmetros de consulta (todos opcionais):**
+
+| Parâmetro | Tipo | Padrão | Regra |
+|---|---|---|---|
+| `search` | string | — | Espaços nas pontas são removidos; vazio = sem filtro. Procura o trecho em `name`, sem diferenciar maiúsculas. Busca literal (`%` e `_` não são curingas). Máximo de 100 caracteres (acima → 400). |
+| `muscleGroup` | `MuscleGroup` | — (todos) | Valor diferente da seção 6.1 → 400 |
+| `status` | `ACTIVE` \| `INACTIVE` | — (todos) | Valor diferente → 400 |
+| `page` | inteiro ≥ 0 | `0` | Mesmas regras da seção 2.6 |
+| `size` | inteiro 1–100 | `20` | Mesmas regras da seção 2.6 |
+| `sort` | `campo,direção` | `name,asc` | Campos permitidos: **`name`, `muscleGroup`, `createdAt`**. Direção `asc` ou `desc`. Pode repetir. Campo fora da lista → **400**. |
+
+- **Desempate estável:** o servidor sempre acrescenta `id,asc` como último critério.
+- Ordenar por `muscleGroup` usa o **valor** do enum (ordem alfabética de `ABS`, `BACK`, `BICEPS`...), não o rótulo em português. Para exibir agrupado por rótulo, ordene no frontend.
+- Página além da última → **200** com `content: []`.
+
+Exemplo: `GET /api/exercises?search=supino&muscleGroup=CHEST&status=ACTIVE&page=0&size=20&sort=name,asc`
+
+Resposta **200**:
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "name": "Supino reto com barra",
+      "muscleGroup": "CHEST",
+      "description": "Deitado no banco, descer a barra até o peito e empurrar até estender os braços.",
+      "status": "ACTIVE",
+      "createdAt": "2026-11-25T14:02:11.482913Z",
+      "updatedAt": "2026-11-25T14:02:11.482913Z"
+    }
+  ],
+  "page": { "size": 20, "number": 0, "totalElements": 1, "totalPages": 1 }
+}
+```
+
+### 6.7 Editar e alterar status
+
+**`PUT /api/exercises/{id}`** — corpo `ExerciseRequest` completo (substituição). Omitir `description` ou enviá-la vazia **remove a descrição**. Não altera `status`; `createdAt` não muda; `updatedAt` é atualizado. O exercício pode manter o próprio nome (inclusive mudando só maiúsculas, ex.: `"supino reto"` → `"Supino Reto"`). Nome de **outro** exercício → 409. Resposta **200** com o `Exercise` atualizado.
+
+**`PATCH /api/exercises/{id}/status`**
+```json
+{ "status": "INACTIVE" }
+```
+| Campo | Obrigatório | Valores | Mensagem |
+|---|---|---|---|
+| `status` | sim | `ACTIVE`, `INACTIVE` | `O status é obrigatório` (ausente/nulo). Valor desconhecido → 400 sem `errors`. |
+
+Resposta **200** com o `Exercise` atualizado. **Idempotente**: repetir o status atual retorna 200 sem alterar `updatedAt`.
+
+### 6.8 Nome duplicado — **409 Conflict**
+
+Em `POST` e `PUT`, quando o nome normalizado (sem diferenciar maiúsculas) pertence a outro exercício, ativo ou inativo. O nome não é repetido na mensagem.
+
+```json
+{
+  "type": "about:blank",
+  "title": "Conflito",
+  "status": 409,
+  "detail": "Já existe um exercício cadastrado com este nome.",
+  "instance": "/api/exercises",
+  "errors": [
+    { "field": "name", "message": "Já existe um exercício cadastrado com este nome." }
+  ]
+}
+```
+
+Exercício inexistente → **404** com `"detail": "Exercício não encontrado."` (formato da seção 3.2).
+
+### 6.9 Tipos TypeScript de exercícios
+
+```ts
+// Tipos do contrato v1.1.0 — reutilizam Page<T>, SortDirection, FieldViolation e ProblemDetail (seção 4).
+
+export type MuscleGroup =
+  | 'CHEST' | 'BACK' | 'SHOULDERS' | 'BICEPS' | 'TRICEPS' | 'FOREARMS' | 'ABS'
+  | 'QUADRICEPS' | 'HAMSTRINGS' | 'GLUTES' | 'CALVES' | 'FULL_BODY' | 'CARDIO' | 'OTHER';
+
+/** Rótulos sugeridos (seção 6.1). */
+export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
+  CHEST: 'Peito',
+  BACK: 'Costas',
+  SHOULDERS: 'Ombros',
+  BICEPS: 'Bíceps',
+  TRICEPS: 'Tríceps',
+  FOREARMS: 'Antebraços',
+  ABS: 'Abdômen',
+  QUADRICEPS: 'Quadríceps',
+  HAMSTRINGS: 'Posteriores de coxa',
+  GLUTES: 'Glúteos',
+  CALVES: 'Panturrilhas',
+  FULL_BODY: 'Corpo inteiro',
+  CARDIO: 'Cardio',
+  OTHER: 'Outro',
+};
+
+/**
+ * Rótulo seguro para valores vindos da API: se o valor não estiver na lista conhecida
+ * (ex.: incluído numa versão futura do contrato), devolve o próprio valor (seção 6.1).
+ */
+export function muscleGroupLabel(value: string): string {
+  // hasOwnProperty (e não o operador "in"): ignora propriedades herdadas como "toString".
+  return Object.prototype.hasOwnProperty.call(MUSCLE_GROUP_LABELS, value)
+    ? MUSCLE_GROUP_LABELS[value as MuscleGroup]
+    : value;
+}
+
+export type ExerciseStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface Exercise {
+  id: number;
+  name: string;
+  muscleGroup: MuscleGroup;
+  description: string | null;
+  status: ExerciseStatus;
+  createdAt: string; // ISO-8601 UTC
+  updatedAt: string; // ISO-8601 UTC
+}
+
+/** Corpo de POST /api/exercises e PUT /api/exercises/{id}. */
+export interface ExerciseRequest {
+  name: string;
+  muscleGroup: MuscleGroup;
+  description?: string | null; // ausente/null/'' = sem descrição
+}
+
+/** Corpo de PATCH /api/exercises/{id}/status. */
+export interface ExerciseStatusRequest {
+  status: ExerciseStatus;
+}
+
+export type ExerciseSortField = 'name' | 'muscleGroup' | 'createdAt';
+export type ExerciseSort = `${ExerciseSortField},${SortDirection}`;
+
+/** Query string de GET /api/exercises. */
+export interface ExerciseListParams {
+  search?: string; // até 100 caracteres
+  muscleGroup?: MuscleGroup;
+  status?: ExerciseStatus;
+  page?: number; // >= 0, padrão 0
+  size?: number; // 1..100, padrão 20
+  sort?: ExerciseSort | ExerciseSort[]; // padrão 'name,asc'; o servidor desempata por id
+}
+```
+
+### 6.10 Dados para mocks
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Supino reto com barra",
+    "muscleGroup": "CHEST",
+    "description": "Deitado no banco, descer a barra até o peito e empurrar até estender os braços.",
+    "status": "ACTIVE",
+    "createdAt": "2026-11-25T14:02:11.482913Z",
+    "updatedAt": "2026-11-25T14:02:11.482913Z"
+  },
+  {
+    "id": 2,
+    "name": "Agachamento livre",
+    "muscleGroup": "QUADRICEPS",
+    "description": null,
+    "status": "ACTIVE",
+    "createdAt": "2026-11-25T14:05:40.2Z",
+    "updatedAt": "2026-11-25T14:05:40.2Z"
+  },
+  {
+    "id": 3,
+    "name": "Puxada frontal",
+    "muscleGroup": "BACK",
+    "description": "Puxar a barra até a altura do queixo, mantendo o tronco estável.",
+    "status": "ACTIVE",
+    "createdAt": "2026-11-25T14:07:03Z",
+    "updatedAt": "2026-11-25T15:30:18.77Z"
+  },
+  {
+    "id": 4,
+    "name": "Esteira",
+    "muscleGroup": "CARDIO",
+    "description": null,
+    "status": "INACTIVE",
+    "createdAt": "2026-11-25T14:09:55.123Z",
+    "updatedAt": "2026-11-25T16:44:02.9123Z"
+  }
+]
+```
+
+---
+
 ## Histórico de alterações
 | Versão | Data | Alteração |
 |---|---|---|
 | 1.0.0 | 2026-11-24 | Versão inicial: recurso `students` (criar, buscar, listar/pesquisar, editar, alterar status), formato de erros e tipos TypeScript. |
+| 1.1.0 | 2026-11-25 | Novo recurso `exercises` (seção 6): catálogo com um grupo muscular principal por exercício, 14 valores de `MuscleGroup`, regras de compatibilidade do enum com o TypeScript e `muscleGroupLabel` com fallback. Tabela de erros (3.3) com o 409 de nome e o 404 de exercício. Seção 2.6: nota "a confirmar" substituída pelo comportamento confirmado em testes (sem mudança de comportamento). Nenhuma alteração incompatível na seção de alunos. |
