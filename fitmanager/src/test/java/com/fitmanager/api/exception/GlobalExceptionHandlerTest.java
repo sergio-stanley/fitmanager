@@ -42,6 +42,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.title").value("Recurso não encontrado"))
                 .andExpect(jsonPath("$.detail").value("Aluno 42 não encontrado"))
                 .andExpect(jsonPath("$.instance").value("/test/not-found"));
@@ -65,6 +66,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.title").value("Dados inválidos"))
                 .andExpect(jsonPath("$.detail").value("Um ou mais campos possuem valores inválidos."))
                 .andExpect(jsonPath("$.instance").value("/test/validation"))
@@ -82,6 +84,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.instance").value("/test/validation"));
     }
 
@@ -91,6 +94,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(content().contentType(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(405))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.instance").value("/test/not-found"));
     }
 
@@ -102,6 +106,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(content().contentType(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.instance").value("/test/validation"));
     }
 
@@ -111,6 +116,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(content().contentType(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.type").value("about:blank"))
                 .andExpect(jsonPath("$.title").value("Erro interno"))
                 .andExpect(jsonPath("$.detail").value("Ocorreu um erro interno. Tente novamente mais tarde."))
                 .andExpect(jsonPath("$.instance").value("/test/unexpected"))
